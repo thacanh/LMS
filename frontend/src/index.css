@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* ── Design Tokens (Academic Curator theme) ─ */
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary:           #990411;
+  --color-primary-container: #bc2626;
+  --color-surface:           #f8f9fc;
+  --color-surface-container: #f2f3f6;
+  --color-surface-card:      #ffffff;
+  --color-on-surface:        #191c1e;
+  --color-on-surface-variant:#5a403e;
+  --color-outline-variant:   rgba(227, 190, 186, 0.35);
+}
+
+/* ── Base ──────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-surface text-on-surface font-sans;
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; border: none; outline: none; }
+  input, textarea, select { font-family: inherit; outline: none; }
+  img { max-width: 100%; display: block; }
+  h1, h2, h3, h4, h5, h6 { font-weight: 700; line-height: 1.3; }
+}
+
+/* ── Spinner ───────────────────────────────── */
+.spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+}
+
+.spinner-dot {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #990411;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
