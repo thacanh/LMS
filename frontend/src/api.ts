@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type AxiosRequestConfig } from 'axios'
 
 // All requests go to the Nginx gateway
 const API_BASE = '/api'
@@ -120,7 +120,7 @@ export const coursesApi = {
 
 /* ── Lessons API ──────────────────────────── */
 export const lessonsApi = {
-  byCourse: (courseId: string) => api.get<Lesson[]>(`/lessons/course/${courseId}`),
+  byCourse: (courseId: string, config?: AxiosRequestConfig) => api.get<Lesson[]>(`/lessons/course/${courseId}`, config),
   get: (id: string) => api.get<Lesson>(`/lessons/${id}`),
   create: (data: Partial<Lesson>) => api.post<Lesson>('/lessons', data),
   update: (id: string, data: Partial<Lesson>) => api.put<Lesson>(`/lessons/${id}`, data),
@@ -147,7 +147,7 @@ export const progressApi = {
 
 /* ── Quiz API ─────────────────────────────── */
 export const quizApi = {
-  byCourse: (courseId: string) => api.get<Quiz[]>(`/quiz/course/${courseId}`),
+  byCourse: (courseId: string, config?: AxiosRequestConfig) => api.get<Quiz[]>(`/quiz/course/${courseId}`, config),
   get: (id: string) => api.get<Quiz>(`/quiz/${id}`),
   create: (data: unknown) => api.post<Quiz>('/quiz', data),
   delete: (id: string) => api.delete(`/quiz/${id}`),

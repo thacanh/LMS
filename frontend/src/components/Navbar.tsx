@@ -20,7 +20,7 @@ export default function Navbar() {
         <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary-container rounded-lg flex items-center justify-center shadow-sm">
           <BookOpen className="w-4 h-4 text-white" />
         </div>
-        <span className="text-xl font-black tracking-tighter text-primary">Academic Curator</span>
+        <span className="text-xl font-black tracking-tighter text-primary">LMS</span>
       </Link>
 
       {/* Điều hướng */}

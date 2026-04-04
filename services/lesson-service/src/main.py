@@ -6,6 +6,7 @@ from typing import List
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Request, status
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from .database import engine, get_db, Base

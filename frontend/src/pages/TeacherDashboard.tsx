@@ -96,10 +96,27 @@ export default function TeacherDashboard() {
   }, [user, isTeacher, navigate])
 
   // Tải bài học + quiz khi chọn khóa học khác
+  // Dùng AbortController để hủy request cũ khi khóa học thay đổi (tránh race condition)
   useEffect(() => {
     if (!selectedCourse) return
-    lessonsApi.byCourse(selectedCourse).then((r) => setLessons(r.data))
-    quizApi.byCourse(selectedCourse).then((r) => setQuizzes(r.data))
+    const controller = new AbortController()
+    let cancelled = false
+
+    setLessons([])
+    setQuizzes([])
+
+    lessonsApi.byCourse(selectedCourse, { signal: controller.signal })
+      .then((r) => { if (!cancelled) setLessons(r.data) })
+      .catch((err) => { if (!cancelled && err.name !== 'CanceledError' && err.name !== 'AbortError') console.error(err) })
+
+    quizApi.byCourse(selectedCourse, { signal: controller.signal })
+      .then((r) => { if (!cancelled) setQuizzes(r.data) })
+      .catch((err) => { if (!cancelled && err.name !== 'CanceledError' && err.name !== 'AbortError') console.error(err) })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
   }, [selectedCourse])
 
   const showMsg = (msg: string) => { setSuccess(msg); setTimeout(() => setSuccess(''), 3000) }
