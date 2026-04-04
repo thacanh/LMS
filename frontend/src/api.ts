@@ -106,6 +106,8 @@ export const authApi = {
   login: (data: { email: string; password: string }) =>
     api.post<{ access_token: string; token_type: string; role: string; user_id: string }>('/auth/login', data),
   me: () => api.get<User>('/auth/me'),
+  logout: () => api.post('/auth/logout'),
+  updateMe: (data: { full_name?: string; password?: string }) => api.put<User>('/auth/me', data),
 }
 
 /* ── Courses API ──────────────────────────── */

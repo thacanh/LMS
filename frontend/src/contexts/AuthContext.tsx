@@ -5,7 +5,8 @@ interface AuthContextType {
   user: User | null
   token: string | null
   login: (token: string, role: string, userId: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
+  updateUser: (data: { full_name?: string; password?: string }) => Promise<void>
   isTeacher: boolean
   loading: boolean
 }
@@ -29,7 +30,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.clear()
             setToken(null)
           }
-          // Nếu không có response (mất mạng, server restart) → giữ nguyên token
         })
         .finally(() => setLoading(false))
     } else {
@@ -44,15 +44,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(r.data)
   }
 
-  const logout = () => {
+  const logout = async () => {
+    // Gọi API logout (server xác nhận), sau đó xóa token cục bộ
+    try { await authApi.logout() } catch { /* bỏ qua nếu mạng lỗi */ }
     localStorage.clear()
     setToken(null)
     setUser(null)
     window.location.href = '/login'
   }
 
+  const updateUser = async (data: { full_name?: string; password?: string }) => {
+    const r = await authApi.updateMe(data)
+    setUser(r.data)
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isTeacher: user?.role === 'teacher', loading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, updateUser, isTeacher: user?.role === 'teacher', loading }}>
       {children}
     </AuthContext.Provider>
   )
