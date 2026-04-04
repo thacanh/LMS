@@ -18,6 +18,7 @@ export default function LearnPage() {
   const [course, setCourse] = useState<Course | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastSent, setLastSent] = useState(0)
+  const [resumeAt, setResumeAt] = useState(0)   // giây cần tua tới khi video load xong
 
   useEffect(() => {
     // Chuyển hướng về trang đăng nhập nếu chưa đăng nhập
@@ -36,11 +37,11 @@ export default function LearnPage() {
       setSiblings(sibs.data)
       setCourse(c.data)
 
-      // Khôi phục vị trí xem dở
+      // Khôi phục vị trí xem dở — lưu vào state, seek sau khi video load xong
       try {
         const prog = await progressApi.getLesson(lessonId)
-        if (prog.data.last_position > 0 && videoRef.current) {
-          videoRef.current.currentTime = prog.data.last_position
+        if (prog.data.last_position > 0) {
+          setResumeAt(prog.data.last_position)
         }
       } catch { /* Lần đầu xem, bỏ qua */ }
     }).finally(() => setLoading(false))
@@ -129,6 +130,13 @@ export default function LearnPage() {
                 className="w-full h-full object-contain"
                 controls
                 src={lesson.video_url}
+                onLoadedMetadata={() => {
+                  // Tua đến vị trí đã xem dở — chỉ có thể seek sau khi metadata load xong
+                  if (resumeAt > 0 && videoRef.current) {
+                    videoRef.current.currentTime = resumeAt
+                    setResumeAt(0)
+                  }
+                }}
                 onTimeUpdate={sendProgress}
                 onEnded={() => {
                   // Đánh dấu hoàn thành khi xem xong
