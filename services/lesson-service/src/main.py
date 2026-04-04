@@ -73,26 +73,37 @@ async def upload_video(
     db: Session = Depends(get_db),
     payload: dict = Depends(require_teacher),
 ):
-    """Teacher: upload video for a lesson. Stores file in VIDEO_STORAGE_PATH."""
+    """Teacher: upload video cho bài học. Lưu file vào VIDEO_STORAGE_PATH."""
     lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
     if not lesson:
         raise HTTPException(status_code=404, detail={"error": "Lesson not found"})
+
+    # Kiểm tra quyền sở hữu qua khóa học
+    from .database import engine as _eng
+    from sqlalchemy import text
+    with _eng.connect() as conn:
+        row = conn.execute(
+            text("SELECT teacher_id FROM lms_courses.courses WHERE id = :cid"),
+            {"cid": lesson.course_id},
+        ).fetchone()
+    if not row or row[0] != payload["sub"]:
+        raise HTTPException(status_code=403, detail={"error": "Not your lesson"})
 
     # Validate file type
     content_type = file.content_type or ""
     if not content_type.startswith("video/"):
         raise HTTPException(status_code=400, detail={"error": "File must be a video"})
 
-    # Save with uuid filename to avoid collisions
+    # Lưu file với tên UUID để tránh trùng
     ext = Path(file.filename).suffix if file.filename else ".mp4"
     filename = f"{uuid.uuid4()}{ext}"
     filepath = VIDEO_DIR / filename
 
-    with open(filepath, "wb") as f:
-        while chunk := await file.read(1024 * 1024):  # 1MB chunks
-            f.write(chunk)
+    # Dùng run_in_threadpool để không block Event Loop khi ghi file nặng
+    file_bytes = await file.read()
+    await run_in_threadpool(filepath.write_bytes, file_bytes)
 
-    # Update lesson record
+    # Cập nhật bản ghi lesson
     lesson.video_path = str(filepath)
     lesson.video_url = f"/api/lessons/{lesson_id}/stream"
     db.commit()

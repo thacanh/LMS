@@ -1,0 +1,244 @@
+openapi: 3.0.3
+info:
+  title: Progress Service API
+  description: |
+    Theo dõi tiến độ học tập của học viên theo từng bài học và khóa học.
+    Base path qua gateway: /api/progress
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api
+    description: Qua Gateway (khuyến nghị)
+  - url: http://localhost:5004
+    description: Trực tiếp (nội bộ Docker)
+
+paths:
+  /progress/health:
+    get:
+      summary: Health check
+      operationId: progressHealth
+      responses:
+        '200':
+          description: Service đang hoạt động
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /progress/lesson/{lesson_id}:
+    get:
+      summary: Tiến độ của học viên tại một bài học
+      operationId: getLessonProgress
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/lessonId'
+      responses:
+        '200':
+          description: Tiến độ bài học
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      summary: Cập nhật tiến độ bài học (upsert, idempotent)
+      operationId: updateLessonProgress
+      description: |
+        Frontend gọi endpoint này mỗi 10 giây khi học viên đang xem video.
+        Nếu chưa có bản ghi thì tạo mới, đã có thì cập nhật.
+        progress_percent chỉ tăng, không giảm.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/lessonId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgressUpdate'
+      responses:
+        '200':
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /progress/course/{course_id}:
+    get:
+      summary: Tổng hợp tiến độ toàn bộ khóa học
+      operationId: getCourseProgress
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseId'
+      responses:
+        '200':
+          description: Tổng hợp tiến độ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseProgressResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /progress/continue:
+    get:
+      summary: Bài học đang học dở gần nhất
+      operationId: continueLeaning
+      description: Trả về bài học có status=in_progress được cập nhật gần nhất. Dùng cho nút "Tiếp tục học".
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Bài học dở dang (null nếu không có)
+          content:
+            application/json:
+              schema:
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/ProgressResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /progress/all:
+    get:
+      summary: Tất cả bản ghi tiến độ của học viên hiện tại
+      operationId: getAllProgress
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Danh sách tiến độ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgressResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    lessonId:
+      name: lesson_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    courseId:
+      name: course_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Token không hợp lệ hoặc chưa đăng nhập
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Không tìm thấy bản ghi tiến độ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: object
+          properties:
+            error:
+              type: string
+
+    ProgressUpdate:
+      type: object
+      required: [course_id, status, progress_percent, last_position]
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [not_started, in_progress, completed]
+        progress_percent:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 45.5
+        last_position:
+          type: number
+          description: Vị trí video tính bằng giây
+          example: 112.3
+
+    ProgressResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        lesson_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [not_started, in_progress, completed]
+        progress_percent:
+          type: number
+        last_position:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CourseProgressResponse:
+      type: object
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        total_lessons:
+          type: integer
+        completed_lessons:
+          type: integer
+        overall_percent:
+          type: number
+          description: Trung bình % hoàn thành của tất cả bài học

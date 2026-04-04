@@ -32,22 +32,25 @@ Hệ thống tự động hoá quy trình học trực tuyến:
 
 ```mermaid
 graph TB
-    U([Người dùng]) -->|HTTP :8080| GW
+    U([Người dùng\nBrowser]) -->|HTTP :8080| GW
 
     subgraph Docker Network
         GW[API Gateway - Nginx :8000]
-        GW -->|:5001| AUTH[auth-service]
-        GW -->|:5002| COURSE[course-service]
-        GW -->|:5003| LESSON[lesson-service]
-        GW -->|:5004| PROGRESS[progress-service]
-        GW -->|:5005| QUIZ[quiz-service]
-        GW --> FE[frontend :3000]
 
-        AUTH --> DB[(MySQL)]
-        COURSE --> DB
-        LESSON --> DB
-        PROGRESS --> DB
-        QUIZ --> DB
+        GW -->|React App| FE[frontend :3000]
+        GW -->|/api/auth/*| AUTH[auth-service :5001]
+        GW -->|/api/courses/*| COURSE[course-service :5002]
+        GW -->|/api/lessons/*| LESSON[lesson-service :5003]
+        GW -->|/api/progress/*| PROGRESS[progress-service :5004]
+        GW -->|/api/quiz/*| QUIZ[quiz-service :5005]
+
+        AUTH --> DB1[(lms_auth)]
+        COURSE --> DB2[(lms_courses)]
+        LESSON --> DB3[(lms_lessons)]
+        PROGRESS --> DB4[(lms_progress)]
+        QUIZ --> DB5[(lms_quiz)]
+
+        DB1 & DB2 & DB3 & DB4 & DB5 -.- MYSQL[(MySQL :3306)]
     end
 ```
 

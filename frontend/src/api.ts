@@ -17,16 +17,12 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Auto-logout on 401
+// Chỉ reject lỗi, KHÔNG tự động xóa token hay redirect
+// Việc xử lý 401 do AuthContext và từng component quyết định
+// (tránh mất dữ liệu khi user đang làm quiz hoặc nhập form)
 api.interceptors.response.use(
   (r) => r,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.clear()
-      window.location.href = '/login'
-    }
-    return Promise.reject(err)
-  }
+  (err) => Promise.reject(err)
 )
 
 export default api

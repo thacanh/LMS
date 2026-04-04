@@ -4,6 +4,7 @@ from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from .database import engine, get_db, Base
 from .models import Progress
@@ -45,8 +46,9 @@ def update_lesson_progress(
     payload: dict = Depends(get_current_user),
 ):
     """
-    Upsert progress for a lesson. Idempotent — latest timestamp wins.
-    Frontend calls this every 10 seconds while watching a video.
+    Upsert tiến độ cho một bài học. Idempotent — dữ liệu mới nhất thắng.
+    Frontend gọi mỗi 10 giây khi đang xem video.
+    Bọc trong try/except IntegrityError để tránh race condition khi 2 request đến cùng lúc.
     """
     user_id = payload["sub"]
     record = (
@@ -55,24 +57,40 @@ def update_lesson_progress(
         .first()
     )
 
-    if record is None:
-        record = Progress(
-            user_id=user_id,
-            lesson_id=lesson_id,
-            course_id=body.course_id,
-            status=body.status,
-            progress_percent=body.progress_percent,
-            last_position=body.last_position,
+    try:
+        if record is None:
+            record = Progress(
+                user_id=user_id,
+                lesson_id=lesson_id,
+                course_id=body.course_id,
+                status=body.status,
+                progress_percent=body.progress_percent,
+                last_position=body.last_position,
+            )
+            db.add(record)
+            db.commit()
+        else:
+            # Last-write-wins: chỉ cập nhật nếu tiến độ tăng lên
+            record.status = body.status
+            record.progress_percent = max(record.progress_percent, body.progress_percent)
+            record.last_position = body.last_position
+            record.updated_at = datetime.datetime.utcnow()
+            db.commit()
+    except IntegrityError:
+        # Race condition: 2 request cùng insert, cái sau bị conflict — fallback sang update
+        db.rollback()
+        record = (
+            db.query(Progress)
+            .filter(Progress.user_id == user_id, Progress.lesson_id == lesson_id)
+            .first()
         )
-        db.add(record)
-    else:
-        # Last-write-wins: only update if new data is more recent (progress advanced)
-        record.status = body.status
-        record.progress_percent = max(record.progress_percent, body.progress_percent)
-        record.last_position = body.last_position
-        record.updated_at = datetime.datetime.utcnow()
+        if record:
+            record.status = body.status
+            record.progress_percent = max(record.progress_percent, body.progress_percent)
+            record.last_position = body.last_position
+            record.updated_at = datetime.datetime.utcnow()
+            db.commit()
 
-    db.commit()
     db.refresh(record)
     return record
 

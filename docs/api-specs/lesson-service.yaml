@@ -1,0 +1,322 @@
+openapi: 3.0.3
+info:
+  title: Lesson Service API
+  description: |
+    Quản lý bài học, upload video và streaming.
+    Base path qua gateway: /api/lessons
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api
+    description: Qua Gateway (khuyến nghị)
+  - url: http://localhost:5003
+    description: Trực tiếp (nội bộ Docker)
+
+paths:
+  /lessons/health:
+    get:
+      summary: Health check
+      operationId: lessonHealth
+      responses:
+        '200':
+          description: Service đang hoạt động
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /lessons/course/{course_id}:
+    get:
+      summary: Danh sách bài học theo khóa học (sắp xếp theo order)
+      operationId: listLessons
+      parameters:
+        - $ref: '#/components/parameters/courseId'
+      responses:
+        '200':
+          description: Danh sách bài học
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LessonResponse'
+
+  /lessons:
+    post:
+      summary: Tạo bài học mới (Teacher only)
+      operationId: createLesson
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LessonCreate'
+      responses:
+        '201':
+          description: Bài học đã được tạo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /lessons/{lesson_id}:
+    get:
+      summary: Chi tiết một bài học
+      operationId: getLesson
+      parameters:
+        - $ref: '#/components/parameters/lessonId'
+      responses:
+        '200':
+          description: Thông tin bài học
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      summary: Cập nhật bài học (Teacher only)
+      operationId: updateLesson
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/lessonId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LessonUpdate'
+      responses:
+        '200':
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Xóa bài học và file video (Teacher only)
+      operationId: deleteLesson
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/lessonId'
+      responses:
+        '204':
+          description: Đã xóa
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /lessons/{lesson_id}/upload:
+    post:
+      summary: Upload video cho bài học (Teacher only)
+      operationId: uploadVideo
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/lessonId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File video (video/mp4, video/webm, ...)
+      responses:
+        '200':
+          description: Upload thành công, video_url được cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonResponse'
+        '400':
+          description: File không phải định dạng video
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /lessons/{lesson_id}/stream:
+    get:
+      summary: Stream video (hỗ trợ HTTP Range Request để tua)
+      operationId: streamVideo
+      parameters:
+        - $ref: '#/components/parameters/lessonId'
+        - name: Range
+          in: header
+          schema:
+            type: string
+            example: bytes=0-1048575
+          description: HTTP Range header để seek video
+      responses:
+        '206':
+          description: Partial content — video chunk
+          headers:
+            Content-Range:
+              schema:
+                type: string
+              example: bytes 0-1048575/10485760
+            Accept-Ranges:
+              schema:
+                type: string
+              example: bytes
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        '200':
+          description: Full video (không có Range header)
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    courseId:
+      name: course_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    lessonId:
+      name: lesson_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Token không hợp lệ hoặc chưa đăng nhập
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Không có quyền thực hiện thao tác này
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Không tìm thấy resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: object
+          properties:
+            error:
+              type: string
+
+    LessonCreate:
+      type: object
+      required: [course_id, title]
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Bài 1 - Giới thiệu Python
+        description:
+          type: string
+          nullable: true
+        order:
+          type: integer
+          default: 0
+
+    LessonUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        order:
+          type: integer
+        duration:
+          type: number
+
+    LessonResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        video_url:
+          type: string
+          nullable: true
+          example: /api/lessons/{id}/stream
+        duration:
+          type: number
+          description: Thời lượng video tính bằng giây
+        order:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
